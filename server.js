@@ -3,6 +3,7 @@ const xmlparser = require('express-xml-bodyparser');
 const util = require('util');
 const axios = require('axios');
 const xml2js = require('xml2js');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3200;
@@ -18,9 +19,30 @@ app.use(xmlparser({ explicitArray: false, normalizeTags: true }));
 app.post('/notificaciones', async (req, res) => {
     if (req.headers['content-type'] === 'application/xml' || req.headers['content-type'] === 'text/xml') {
         try {
+            // Crear un agente https con la configuración para ignorar errores de certificados
+            const agent = new https.Agent({
+                rejectUnauthorized: false, // Ignorar problemas de certificados (en producción, usa certificados válidos)
+                keepAlive: true,
+                minVersion: 'TLSv1.2',  // Usar la versión mínima TLS 1.2
+                ciphers: [
+                    'TLS_AES_256_GCM_SHA384',
+                    'TLS_CHACHA20_POLY1305_SHA256',
+                    'TLS_AES_128_GCM_SHA256',
+                    'ECDHE-ECDSA-AES128-GCM-SHA256',
+                    'ECDHE-RSA-AES128-GCM-SHA256',
+                    'ECDHE-ECDSA-AES256-GCM-SHA384',
+                    'ECDHE-RSA-AES256-GCM-SHA384',
+                    'ECDHE-ECDSA-CHACHA20-POLY1305',
+                    'ECDHE-RSA-CHACHA20-POLY1305',
+                    'DHE-RSA-AES128-GCM-SHA256',
+                    'DHE-RSA-AES256-GCM-SHA384'
+                ].join(':')
+            });
+
             // Enviar el XML tal cual se recibe, con todas las cabeceras originales
             const response = await axios.post('https://api.stage.papajohns.cl/v1/middleware/orders/aloha_order?aloha_store_id=324626', req.rawBody, {
-                headers: req.headers
+                headers: req.headers,
+                httpsAgent: agent
             });
             console.log('Notificación enviada:', response.status, response.statusText);
 
@@ -45,5 +67,5 @@ app.post('/notificaciones', async (req, res) => {
 
 // Iniciar el servidor
 app.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
+    console.log(`Servidor HTTP escuchando en el puerto ${PORT}`);
 });
